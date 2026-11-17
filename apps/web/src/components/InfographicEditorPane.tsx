@@ -1,5 +1,5 @@
 import { AI_ASSISTANT_LAUNCHER_POSITION } from "@/lib/ai-assistant-launcher";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, Download, FileCode2, FileImage, LayoutTemplate, LoaderCircle, Pencil, Sparkles } from "lucide-react";
 import * as m from "motion/react-m";
 import { useTranslation } from "react-i18next";
@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { InfographicGallery } from "./InfographicGallery";
-import { useAppearanceTheme } from "./ThemeProvider";
 import type { InfographicSample } from "@/lib/infographic-samples";
 import { AiSidebar, readAiSidebarOpen, writeAiSidebarOpen } from "@/components/ai-sidebar/AiSidebar";
 import { AiSidebarErrorBoundary } from "@/components/ai-sidebar/AiSidebarErrorBoundary";
@@ -29,8 +28,7 @@ import { formatShortcutBinding, getNotebookMoveOptions, type ShortcutSettings } 
 import { createLocalEditSession, requiresLocalEditSession } from "@/components/editor/editor-pane-helpers";
 import { createClientUuid } from "@/lib/client-id";
 import { infographicSessionHistory, infographicSessionStamp, infographicSessionThreads, infographicTurnSessionId, resolveInfographicSessionId } from "@/lib/infographic-sessions";
-import { canvasToPngBlob, downloadBlob, frameInfographicExportSvg, infographicExportBasename, rasterizeInfographicSvg, readInfographicSheetColor, renderInfographicExportSvg } from "@/lib/infographic-image-export";
-import { infographicPreviewSyntax, infographicUsesDarkSheet } from "@/lib/infographic-preview-theme";
+import { canvasToPngBlob, downloadBlob, frameInfographicExportSvg, infographicExportBasename, rasterizeInfographicSvg, readInfographicSheetColor } from "@/lib/infographic-image-export";
 import { buildInfographicSyntax, buildOfficialInfographicSyntax, infographicAgentCandidates, infographicNoteTitleIsAutomatic, infographicSyntaxTitle, INFOGRAPHIC_TEMPLATES, nextInfographicNoteTitle, parseGeneratedOfficialData, type InfographicItem } from "@/lib/infographic-generation";
 import { statusSettleMotion } from "@/lib/motion";
 import { advanceInfographicSyncBase, classifyInfographicUpdate, infographicEditorSnapshot, infographicMemoSnapshot } from "@/lib/infographic-sync";
@@ -229,7 +227,6 @@ function InfographicEditorSession({
   onOpenCompanionNote,
 }: Props) {
   const { t, i18n } = useTranslation();
-  const { resolvedTheme } = useAppearanceTheme();
   const parsed = useMemo(() => parseInfographicDocument(memo.contentMarkdown), [memo.contentMarkdown]);
   const initialTags = memo.tags.join(", ");
   const [title, setTitle] = useState(memo.title ?? "");
@@ -241,7 +238,6 @@ function InfographicEditorSession({
   }));
   const [tagsText, setTagsText] = useState(initialTags);
   const [syntax, setSyntax] = useState(parsed?.syntax ?? "");
-  const previewSyntax = infographicPreviewSyntax(syntax, resolvedTheme === "dark");
   const [history, setHistory] = useState<InfographicConversationTurn[]>(parsed?.history ?? []);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(parsed?.activeSessionId ?? null);
   const [activeTurn, setActiveTurn] = useState<{ prompt: string; response: string; template?: string; decision?: string; question?: string } | null>(null);
@@ -252,8 +248,6 @@ function InfographicEditorSession({
   const [error, setError] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [previewReady, setPreviewReady] = useState(false);
-  const [previewTextEditable, setPreviewTextEditable] = useState(false);
-  const editHintId = useId();
   const [ready, setReady] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState(() => infographicMemoSnapshot(memo) ?? "");
   const [savedHistorySnapshot, setSavedHistorySnapshot] = useState(JSON.stringify(parsed?.history ?? []));
@@ -375,7 +369,6 @@ function InfographicEditorSession({
 
   useEffect(() => {
     setPreviewReady(false);
-    setPreviewTextEditable(false);
     if (!syntax.trim()) { instanceRef.current?.destroy(); instanceRef.current = null; setRenderError(null); return; }
     let cancelled = false;
     const timer = window.setTimeout(() => {
@@ -442,10 +435,9 @@ function InfographicEditorSession({
             setPreviousGeneration(null);
             setSyntax(nextSyntax);
           });
-          instance.render(previewSyntax);
+          instance.render(syntax);
           instanceRef.current = instance;
           setRenderError(null);
-          setPreviewTextEditable(visualTextEditable);
           setPreviewReady(true);
         } catch (caught) {
           console.error("Failed to render infographic", caught);
@@ -458,7 +450,7 @@ function InfographicEditorSession({
       });
     }, 250);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [syntax, previewSyntax, readOnly, t]);
+  }, [syntax, readOnly, t]);
 
   useEffect(() => () => { instanceRef.current?.destroy(); }, []);
 
@@ -719,12 +711,8 @@ function InfographicEditorSession({
     if (!(svg instanceof SVGSVGElement) || renderError || !previewReady) return;
     try {
       const { exportToSVG } = await import("@antv/infographic");
-      const { svg: exported, sheetColor } = previewSyntax !== syntax
-        ? await renderInfographicExportSvg(syntax, svg.getBoundingClientRect())
-        : {
-          svg: await exportToSVG(svg),
-          sheetColor: readInfographicSheetColor(containerRef.current, infographicUsesDarkSheet(syntax)),
-        };
+      const exported = await exportToSVG(svg);
+      const sheetColor = readInfographicSheetColor(containerRef.current?.parentElement ?? null, syntax.split("\n")[1] === "theme dark");
       frameInfographicExportSvg(exported, sheetColor);
       const basename = infographicExportBasename(title.trim() || t("infographic.name"));
       if (type === "svg") {
@@ -737,7 +725,7 @@ function InfographicEditorSession({
     }
   };
 
-  const previewUsesLightSheet = !infographicUsesDarkSheet(previewSyntax);
+  const previewUsesLightSheet = Boolean(syntax.trim()) && syntax.split("\n")[1] !== "theme dark";
   const saveStatus = saving ? "saving" : dirty || visualEditing ? "unsaved" : "saved";
   const saveLabel = t(`editor.saveState.${saveStatus}`);
   const saveStatusClassName = saveStatus === "saved" ? "text-slate-400" : "bg-slate-100 text-slate-700";
@@ -886,34 +874,9 @@ function InfographicEditorSession({
       </div>
     </header>
     {error ? <p role="alert" className="border-b border-red-100 bg-red-50 px-5 py-2 text-sm text-red-700">{error}</p> : null}
-    <section className="flex min-h-0 flex-1 flex-col overflow-auto bg-slate-50 p-4">
-      {!readOnly && syntax.trim() ? (
-        <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3" data-infographic-edit-guide="">
-          <div className="min-w-0 space-y-1 text-xs leading-5 text-slate-500">
-            {previewTextEditable ? (
-              <p id={editHintId} className="flex items-start gap-1.5 text-slate-700">
-                <Pencil className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                {t("infographic.doubleClickText")}
-              </p>
-            ) : null}
-            <p>{t("infographic.aiEditHint")}</p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="shrink-0 gap-1.5 bg-card"
-            data-ai-assistant-launcher=""
-            aria-expanded={aiAssistantOpen}
-            onClick={() => setAiSidebarOpen(true)}
-          >
-            <Sparkles className="size-4" aria-hidden="true" />
-            {t("infographic.editWithAi")}
-          </Button>
-        </div>
-      ) : null}
+    <section className="min-h-0 flex-1 overflow-auto bg-slate-50 p-4">
       {!syntax.trim() ? (
-        <div className="relative min-h-full rounded-xl border border-border bg-background p-2 sm:p-4 shadow-sm">
+        <div className="relative min-h-full rounded-xl border border-slate-200 bg-white p-2 sm:p-4 shadow-sm">
           <div ref={containerRef} className="edgeever-infographic-preview hidden" />
           <InfographicGallery
             readOnly={readOnly}
@@ -921,13 +884,13 @@ function InfographicEditorSession({
           />
         </div>
       ) : (
-        <div className={`relative flex min-h-[420px] flex-1 flex-col rounded-xl border border-slate-200 p-4 shadow-sm ${previewUsesLightSheet ? "bg-white" : "bg-card"}`}>
-          <div ref={containerRef} className={cn("edgeever-infographic-preview min-h-[380px] w-full flex-1", previewTextEditable && "edgeever-infographic-text-editable")} aria-describedby={previewTextEditable ? editHintId : undefined} />
+        <div className={`relative flex min-h-full flex-col rounded-xl border border-slate-200 p-4 shadow-sm ${previewUsesLightSheet ? "bg-white" : "bg-card"}`}>
+          <div ref={containerRef} className="edgeever-infographic-preview min-h-[380px] w-full flex-1" />
           {renderError ? <p role="alert" className="text-sm text-destructive">{renderError}</p> : null}
         </div>
       )}
     </section>
-    {!readOnly && !aiAssistantOpen && !syntax.trim() ? (
+    {!readOnly && !aiAssistantOpen ? (
       <IconTooltip
         side="left"
         label={`${t("aiAssistant.open")} (${formatShortcutBinding(shortcutSettings.openAiAssistant)})`}

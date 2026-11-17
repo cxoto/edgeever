@@ -9,7 +9,6 @@ import {
 } from "@/lib/note-print";
 import type { MermaidThemeName } from "@/components/ThemeProvider";
 import { getMessageTargetOrigin } from "@/lib/app-page-path";
-import { notePrintMessageOrigin } from "@/lib/note-print-window";
 import { withEnvironmentTitlePrefix } from "@/lib/environment-title";
 import { notePrintAppearanceCss } from "@/lib/note-print-appearance";
 import { installEditorBodyFontFaces } from "@/lib/editor-body-font-faces";
@@ -180,7 +179,7 @@ printButton?.addEventListener("click", () => {
 
 window.addEventListener("message", (event: MessageEvent<NotePrintPayload>) => {
   if (
-    event.origin !== notePrintMessageOrigin(window.location.origin) ||
+    event.origin !== window.location.origin ||
     event.source !== window.opener ||
     event.data?.type !== NOTE_PRINT_MESSAGE ||
     event.data.token !== token
@@ -199,7 +198,7 @@ window.addEventListener("message", (event: MessageEvent<NotePrintPayload>) => {
 if (window.opener && token) {
   window.opener.postMessage(
     { type: NOTE_PRINT_READY_MESSAGE, token },
-    getMessageTargetOrigin(notePrintMessageOrigin(window.location.origin))
+    getMessageTargetOrigin(window.location.origin)
   );
 } else {
   setText(status, "EdgeEver");

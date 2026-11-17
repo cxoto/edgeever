@@ -2,20 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { clearInstanceSessionCookie, decodeSessionCredential, writeSessionCredential } from "./session-credential.mjs";
-
-test("offline sign-out removes and persists only the configured instance session cookie", async () => {
-  const calls = [];
-  const cookies = {
-    remove: async (...args) => { calls.push(args); },
-    flushStore: async () => { calls.push(["flush"]); },
-  };
-  await clearInstanceSessionCookie(cookies, "https://old.example.test/edgeever");
-  expect(calls).toEqual([["https://old.example.test/", "edgeever_session"], ["flush"]]);
-  calls.length = 0;
-  await clearInstanceSessionCookie(cookies, "");
-  expect(calls).toEqual([]);
-});
+import { decodeSessionCredential, writeSessionCredential } from "./session-credential.mjs";
 
 test("logout removes the saved session even when the keyring cannot encrypt", async () => {
   const directory = await mkdtemp(join(tmpdir(), "edgeever-session-test-"));

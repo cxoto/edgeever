@@ -1,14 +1,13 @@
 import { DOMSerializer } from "@tiptap/pm/model";
 import type { Editor } from "@tiptap/react";
 import type { TiptapDoc } from "@edgeever/shared";
-import { getMessageTargetOrigin } from "@/lib/app-page-path";
-import { NOTE_PRINT_PATH, notePrintMessageOrigin } from "@/lib/note-print-window";
+import { getAppPagePath, getMessageTargetOrigin } from "@/lib/app-page-path";
 import { createClientUuid } from "@/lib/client-id";
 import type { NotePrintAppearance } from "@/lib/note-print-appearance";
 
 export const NOTE_PRINT_MESSAGE = "edgeever:note-print";
 export const NOTE_PRINT_READY_MESSAGE = "edgeever:note-print-ready";
-export { NOTE_PRINT_PATH };
+export const NOTE_PRINT_PATH = getAppPagePath("note-print.html", import.meta.env.BASE_URL);
 
 export type NotePrintLabels = {
   close: string;
@@ -49,12 +48,11 @@ export const openNotePrintPreview = (
   preopenedWindow?: Window,
 ) => {
   const token = createClientUuid();
-  const messageOrigin = notePrintMessageOrigin(window.location.origin);
   let printWindow: Window | null = preopenedWindow ?? null;
 
   const handleMessage = (event: MessageEvent<NotePrintReadyMessage>) => {
     if (
-      event.origin !== messageOrigin ||
+      event.origin !== window.location.origin ||
       event.source !== printWindow ||
       event.data?.type !== NOTE_PRINT_READY_MESSAGE ||
       event.data.token !== token
@@ -69,7 +67,7 @@ export const openNotePrintPreview = (
         type: NOTE_PRINT_MESSAGE,
         token,
       } satisfies NotePrintPayload,
-      getMessageTargetOrigin(messageOrigin)
+      getMessageTargetOrigin(window.location.origin)
     );
   };
 

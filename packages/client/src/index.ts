@@ -800,7 +800,7 @@ export const createEdgeEverClient = (options: EdgeEverClientOptions = {}) => {
 
     getInstanceRelease: () => request<InstanceRelease>("/api/release"),
 
-    getSession: (options?: { signal?: AbortSignal }) => request<AuthSession>("/api/v1/auth/session", options),
+    getSession: () => request<AuthSession>("/api/v1/auth/session"),
 
     getPublicNotebookShare: (token: string) =>
       request<{ share: PublicNotebookShare }>(`/api/public/notebook-shares/${encodeURIComponent(token)}`),
@@ -1296,9 +1296,8 @@ export const createEdgeEverClient = (options: EdgeEverClientOptions = {}) => {
         body: JSON.stringify(payload),
       }),
 
-    logout: (options?: { signal?: AbortSignal }) =>
+    logout: () =>
       request<{ ok: true }>("/api/v1/auth/logout", {
-        signal: options?.signal,
         method: "POST",
         body: JSON.stringify({}),
       }),
